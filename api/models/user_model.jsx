@@ -2,7 +2,7 @@ import { timestamps } from 'bson';
 import mongoose from 'mongoose';
 
 
-const userSchema = new mongoose.userSchema({
+const userSchema = new mongoose.Schema({
     username: {
         type: String,
         required: true,
