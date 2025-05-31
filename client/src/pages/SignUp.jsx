@@ -89,7 +89,7 @@ export default function SignUp() {
 
         <p className='text-center mt-6 text-sm text-gray-600'>
           Already have an account?
-          <Link to="/login" className='text-blue-600 font-medium ml-1 hover:underline'>
+          <Link to="/signin" className='text-blue-600 font-medium ml-1 hover:underline'>
             Sign In
           </Link>
         </p>
