@@ -1,93 +1,81 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  signInStart,
+  signInSuccess,
+  signInFailure,
+} from '../redux/user/userSlice';
 
 export default function SignIn() {
   const [formData, setFormData] = useState({});
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const { loading, error } = useSelector((state) => state.user);
   const navigate = useNavigate();
-
+  const dispatch = useDispatch();
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.id]: e.target.value,
     });
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      setLoading(true);
+      dispatch(signInStart());
       const res = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify(formData),
       });
 
       const data = await res.json();
-      console.log(data);
-      if (data.success === false) {
-        setLoading(false);
-        setError(data.message);
+
+      if (!res.ok) {
+        dispatch(signInFailure(data.message || 'Something went wrong'));
         return;
       }
-      setLoading(false);
-      setError(null);
+
+      dispatch(signInSuccess(data));
       navigate('/');
     } catch (error) {
-      setLoading(false);
-      setError(error.message);
+      dispatch(signInFailure(error.message));
     }
   };
-
   return (
-    <div className='min-h-screen flex items-center justify-center bg-gradient-to-r from-slate-100 to-slate-200 px-4'>
-      <div className='w-full max-w-md bg-white shadow-2xl rounded-2xl p-8'>
-        <h1 className='text-4xl font-bold text-center text-slate-800 mb-6'>
-          Login
-        </h1>
+    <div className='p-3 max-w-lg mx-auto'>
+      <h1 className='text-3xl text-center font-semibold my-7'>Sign In</h1>
+      <form onSubmit={handleSubmit} className='flex flex-col gap-4'>
+        <input
+          type='email'
+          placeholder='email'
+          className='border p-3 rounded-lg'
+          id='email'
+          onChange={handleChange}
+        />
+        <input
+          type='password'
+          placeholder='password'
+          className='border p-3 rounded-lg'
+          id='password'
+          onChange={handleChange}
+        />
 
-        <form onSubmit={handleSubmit} className='flex flex-col gap-5'>
-          <input
-            type='email'
-            placeholder='Email'
-            id='email'
-            onChange={handleChange}
-            className='border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-600 transition'
-          />
-          <input
-            type='password'
-            placeholder='Password'
-            id='password'
-            onChange={handleChange}
-            className='border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-600 transition'
-          />
-
-          <button
-            disabled={loading}
-            type='submit'
-            className='bg-slate-700 text-white font-semibold py-3 rounded-lg uppercase hover:bg-slate-800 transition duration-200 disabled:opacity-70'
-          >
-            {loading ? 'Loading...' : 'Sign In'}
-          </button>
-        </form>
-
-        {error && (
-          <p className='text-red-500 text-sm text-center mt-4'>
-            {error}
-          </p>
-        )}
-
-        <p className='text-center mt-6 text-sm text-gray-600'>
-          Dont have an account?
-          <Link to="/signUp" className='text-blue-600 font-medium ml-1 hover:underline'>
-            Sign Up
-          </Link>
-        </p>
+        <button
+          disabled={loading}
+          className='bg-slate-700 text-white p-3 rounded-lg uppercase hover:opacity-95 disabled:opacity-80'
+        >
+          {loading ? 'Loading...' : 'Sign In'}
+        </button>
+      </form>
+      <div className='flex gap-2 mt-5'>
+        <p>Dont have an account?</p>
+        <Link to={'/signup'}>
+          <span className='text-blue-700'>Sign up</span>
+        </Link>
       </div>
+      {error && <p className='text-red-500 mt-5'>{error}</p>}
     </div>
   );
 }
