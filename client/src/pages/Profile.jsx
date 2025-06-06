@@ -1,12 +1,5 @@
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { useRef, useState, useEffect } from "react";
-import {
-  getStorage,
-  ref,
-  getDownloadURL,
-  uploadBytesResumable,
-} from "firebase/storage";
-import { app } from "./../firebase";
 import { Link } from "react-router-dom";
 import {
   updateUserSuccess,
@@ -17,25 +10,18 @@ import {
   deleteUserSuccess,
   SignOutUserStart,
   SignOutUserFailure,
-  SignOutUserSuccess
+  SignOutUserSuccess,
 } from "../redux/user/userSlice";
-import { useDispatch } from "react-redux";
 
-export default function profile() {
+export default function Profile() {
   const fileRef = useRef(null);
-  const { currentUser, loading, error } = useSelector((state) => state.user);
-  const [file, setfile] = useState(undefined);
+  const { currentUser, loading } = useSelector((state) => state.user);
+  const [file, setFile] = useState(undefined);
   const [filePerc, setFilePerc] = useState(0);
   const [fileUploadError, setFileUploadError] = useState(false);
   const [formData, setFormData] = useState({});
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const dispatch = useDispatch();
-
-  // firebase storage
-  // allow read;
-  // allow write: if
-  // request.resource.size < 2 * 1024 * 1024 &&
-  // request.resource.contentType.matches('image/.*')
 
   useEffect(() => {
     if (file) {
@@ -43,28 +29,45 @@ export default function profile() {
     }
   }, [file]);
 
-  const handleFileUpload = (file) => {
-    const storage = getStorage(app);
-    const fileName = new Date().getTime() + file.name;
-    const storageRef = ref(storage, fileName);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+  const handleFileUpload = async (file) => {
+    const formDataCloud = new FormData();
+    formDataCloud.append("image", file);
 
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        const progress =
-          (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        setFilePerc(Math.round(progress));
-      },
-      (error) => {
-        setFileUploadError(true);
-      },
-      () => {
-        getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) =>
-          setFormData({ ...formData, avatar: downloadURL })
-        );
+    try {
+      setFileUploadError(false);
+      setFilePerc(0);
+
+      const uploadInterval = setInterval(() => {
+        setFilePerc((prev) => {
+          if (prev < 95) return prev + 5;
+          clearInterval(uploadInterval);
+          return prev;
+        });
+      }, 100);
+
+      const res = await fetch("http://localhost:3000/api/upload/image", {
+        method: "POST",
+        body: formDataCloud,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Upload failed with status ${res.status}`);
       }
-    );
+
+      const data = await res.json();
+      clearInterval(uploadInterval);
+
+      if (data.success === false || !data.url) {
+        setFileUploadError(true);
+        return;
+      }
+
+      setFormData((prev) => ({ ...prev, avatar: data.url }));
+      setFilePerc(100);
+    } catch (error) {
+      setFileUploadError(true);
+      console.error("Cloudinary Upload Error:", error);
+    }
   };
 
   const handleChange = (e) => {
@@ -132,11 +135,10 @@ export default function profile() {
 
   return (
     <div className="p-3 max-w-lg mx-auto">
-      {" "}
-      <h1 className=" text-3xl font-semibold text-center m-7">Profile</h1>
+      <h1 className="text-3xl font-semibold text-center m-7">Profile</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <input
-          onChange={(e) => setfile(e.target.files[0])}
+          onChange={(e) => setFile(e.target.files[0])}
           type="file"
           ref={fileRef}
           hidden
@@ -147,12 +149,13 @@ export default function profile() {
           onClick={() => fileRef.current.click()}
           src={formData.avatar || currentUser.avatar}
           alt="profile"
-          className="rounded-full h-24 object-cover cursor-pointer self-center mt-2 "
+          className="rounded-full h-24 w-24 object-cover cursor-pointer self-center mt-2"
         />
+
         <p className="text-sm self-center text-gray-500">
           {fileUploadError ? (
             <span className="text-red-600">
-              Error Image upload(Image Must be less than 2MB)
+              Error uploading image (must be &lt; 2MB)
             </span>
           ) : filePerc > 0 && filePerc < 100 ? (
             <span className="text-green-600">{`Uploading ${filePerc}%`}</span>
@@ -162,9 +165,10 @@ export default function profile() {
             " "
           )}
         </p>
+
         <input
           type="text"
-          placeholder="username"
+          placeholder="Username"
           id="username"
           className="border p-3 rounded-lg"
           defaultValue={currentUser.username}
@@ -172,7 +176,7 @@ export default function profile() {
         />
         <input
           type="email"
-          placeholder="email"
+          placeholder="Email"
           id="email"
           className="border p-3 rounded-lg"
           defaultValue={currentUser.email}
@@ -180,7 +184,7 @@ export default function profile() {
         />
         <input
           type="password"
-          placeholder="password"
+          placeholder="Password"
           id="password"
           className="border p-3 rounded-lg"
           onChange={handleChange}
@@ -189,12 +193,16 @@ export default function profile() {
           disabled={loading}
           className="bg-slate-700 text-white rounded-lg p-3 uppercase hover:opacity-95 disabled:opacity-80"
         >
-          {loading ? "Loading.." : "Update"}
+          {loading ? "Loading..." : "Update"}
         </button>
-        <Link className="bg-green-700 text-white p-3 rounded-lg uppercase text-center hover:opacity-95" to={'/create_listing'} >
+        <Link
+          to="/create_listing"
+          className="bg-green-700 text-white p-3 rounded-lg uppercase text-center hover:opacity-95"
+        >
           Create New Listing
         </Link>
       </form>
+
       <div className="flex justify-between mt-5">
         <span
           onClick={handleDeleteUser}
@@ -206,8 +214,9 @@ export default function profile() {
           Sign Out
         </span>
       </div>
+
       <p className="text-green-600 text-center mt-3">
-        {updateSuccess ? "Profile updated successfully" : " "}
+        {updateSuccess ? "Profile updated successfully" : ""}
       </p>
     </div>
   );
